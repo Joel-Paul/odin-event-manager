@@ -1,6 +1,7 @@
 require 'csv'
 require 'google/apis/civicinfo_v2'
 require 'erb'
+require 'time'
 
 def clean_zipcode(zipcode)
   zipcode.to_s.rjust(5,"0")[0..4]
@@ -43,6 +44,20 @@ def save_thank_you_letter(id,form_letter)
   end
 end
 
+def save_peak_hours(hour_count)
+  Dir.mkdir('output') unless Dir.exist?('output')
+
+  filename = 'output/peak_hours.csv'
+  File.open(filename, 'w') do |file|
+    peak_hours = hour_count.sort_by{ |_, v| -v }.to_h
+    file.puts 'Time, Count'
+    peak_hours.each do |hour, count|
+      time12h = Time.strptime(hour.to_s, '%k').strftime('%r')
+      file.puts "#{time12h}, #{count}"
+    end
+  end
+end
+
 puts 'EventManager initialized.'
 
 contents = CSV.open(
@@ -53,15 +68,22 @@ contents = CSV.open(
 
 template_letter = File.read('form_letter.erb')
 erb_template = ERB.new template_letter
+hour_count = Hash.new(0)
 
 contents.each do |row|
   id = row[0]
   name = row[:first_name]
+  
   zipcode = clean_zipcode(row[:zipcode])
-  homephone = clean_homephone(row[:homephone])
   legislators = legislators_by_zipcode(zipcode)
+  
+  homephone = clean_homephone(row[:homephone])
+
+  time = Time.strptime(row[:regdate], '%m/%e/%y %k:%M')
+  hour_count[time.hour] += 1
 
   form_letter = erb_template.result(binding)
-
   save_thank_you_letter(id,form_letter)
 end
+
+save_peak_hours(hour_count)

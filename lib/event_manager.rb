@@ -58,6 +58,20 @@ def save_peak_hours(hour_count)
   end
 end
 
+def save_peak_weekdays(weekday_count)
+  Dir.mkdir('output') unless Dir.exist?('output')
+
+  filename = 'output/peak_weekdays.csv'
+  File.open(filename, 'w') do |file|
+    peak_weekdays = weekday_count.sort_by{ |_, v| -v }.to_h
+    file.puts 'Weekday, Count'
+    peak_weekdays.each do |wday, count|
+      weekday = Date::DAYNAMES[wday]
+      file.puts "#{weekday}, #{count}"
+    end
+  end
+end
+
 puts 'EventManager initialized.'
 
 contents = CSV.open(
@@ -69,6 +83,7 @@ contents = CSV.open(
 template_letter = File.read('form_letter.erb')
 erb_template = ERB.new template_letter
 hour_count = Hash.new(0)
+weekday_count = Hash.new(0)
 
 contents.each do |row|
   id = row[0]
@@ -81,9 +96,11 @@ contents.each do |row|
 
   time = Time.strptime(row[:regdate], '%m/%e/%y %k:%M')
   hour_count[time.hour] += 1
+  weekday_count[time.wday] += 1
 
   form_letter = erb_template.result(binding)
   save_thank_you_letter(id,form_letter)
 end
 
 save_peak_hours(hour_count)
+save_peak_weekdays(weekday_count)
